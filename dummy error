@@ -1,1 +1,1 @@
-https://dtszoaal8ujla.cloudfront.net
+psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d ksp_workboard -c "INSERT INTO users (username, password_hash, role, display_name, locale, created_at, updated_at) VALUES ('admin', '\$2a\$10\$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'ADMIN', 'Administrator', 'en', NOW(), NOW());"

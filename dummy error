@@ -1,1 +1,4 @@
-psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d ksp_workboard -c "INSERT INTO users (username, password_hash, role, display_name, locale, created_at, updated_at) VALUES ('admin', '\$2a\$10\$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'ADMIN', 'Administrator', 'en', NOW(), NOW());"
+cd ~/OneDrive\ -\ BT\ Plc/Documents/learning_path/Ai\ learnings/KSP/backend
+./gradlew bootJar -x test
+scp -i ~/ksp-key.pem build/libs/ksp-workboard-0.0.1-SNAPSHOT.jar ec2-user@35.173.8.76:/opt/ksp/ksp-workboard.jar
+ssh -i ~/ksp-key.pem ec2-user@35.173.8.76 "sudo systemctl restart ksp-backend"

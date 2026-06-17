@@ -1,4 +1,4 @@
-cd ~/OneDrive\ -\ BT\ Plc/Documents/learning_path/Ai\ learnings/KSP/backend
-./gradlew bootJar -x test
-scp -i ~/ksp-key.pem build/libs/ksp-workboard-0.0.1-SNAPSHOT.jar ec2-user@35.173.8.76:/opt/ksp/ksp-workboard.jar
-ssh -i ~/ksp-key.pem ec2-user@35.173.8.76 "sudo systemctl restart ksp-backend"
+cd ~/OneDrive\ -\ BT\ Plc/Documents/learning_path/Ai\ learnings/KSP/frontend
+npm run build
+aws s3 sync dist/ s3://ksp-frontend-bucket/ --delete
+aws cloudfront create-invalidation --distribution-id E3BFBLGQL4FPA3 --paths "/*"

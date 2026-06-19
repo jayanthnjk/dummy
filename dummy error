@@ -1,1 +1,1 @@
-pg_restore -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d ksp_workboard --no-owner --no-acl /tmp/ksp_dump.backup
+psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d ksp_workboard -f /tmp/ksp_dump.backup

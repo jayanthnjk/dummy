@@ -1,4 +1,8 @@
-cd ~/OneDrive\ -\ BT\ Plc/Documents/learning_path/Ai\ learnings/KSP/frontend
-npm run build
-aws s3 sync dist/ s3://ksp-frontend-bucket/ --delete
-aws cloudfront create-invalidation --distribution-id E3BFBLGQL4FPA3 --paths "/*"
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": "bedrock:InvokeModel",
+    "Resource": "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0"
+  }]
+}

@@ -1,6 +1,11 @@
-add duty type test
+create employee test01
 
-<thinking>The user wants to add a new duty type to the system. However, there is no tool available to add a new duty type. I need to inform the user that this action cannot be performed with the current tools.</thinking>
+Personnel record created successfully for test01 (TEST-01)
 
-<thinking>I will inform the user that adding a new duty type is not possible with the current tools.</thinking>
-I'm sorry, but I cannot add a new duty type with the current tools. If you need to add a new duty type, please inform the system administrator.
+Name: test01
+
+Badge ID: TEST-01
+
+Designation: —
+
+Section: A

@@ -1,11 +1,35 @@
-create employee test01
+$ bash deploy/aws/deploy.sh 35.173.8.76
+=========================================
+  KSP Workboard - Full Deploy
+=========================================
 
-Personnel record created successfully for test01 (TEST-01)
+[1/6] Building backend JAR...
+D:\workspace\ksp\ksp-v4\backend\src\main\java\com\policescheduler\dto\CreateSupportTicketRequest.java:24: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private String priority = "MEDIUM";
+                   ^
+D:\workspace\ksp\ksp-v4\backend\src\main\java\com\policescheduler\chat\executor\CycleMcpServer.java:166: error: incompatible types: @jakarta.validation.constraints.NotNull(message="Platoon ID is required") Long cannot be converted to int
+                        int platoonIdx = (int) m.platoonId();
+                                                          ^
+Note: D:\workspace\ksp\ksp-v4\backend\src\main\java\com\policescheduler\config\RestTemplateConfig.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+1 error
+1 warning
 
-Name: test01
+FAILURE: Build failed with an exception.
 
-Badge ID: TEST-01
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler output below.
+  Note: Recompile with -Xlint:deprecation for details.D:\workspace\ksp\ksp-v4\backend\src\main\java\com\policescheduler\chat\executor\CycleMcpServer.java:166: error: incompatible types: @jakarta.validation.constraints.NotNull(message="Platoon ID is required") Long cannot be converted to int
+                          int platoonIdx = (int) m.platoonId();
+                                                            ^Note: D:\workspace\ksp\ksp-v4\backend\src\main\java\com\policescheduler\config\RestTemplateConfig.java uses or overrides a deprecated API.D:\workspace\ksp\ksp-v4\backend\src\main\java\com\policescheduler\dto\CreateSupportTicketRequest.java:24: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+      private String priority = "MEDIUM";
+                     ^
+  1 error
+  1 warning
 
-Designation: —
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights.
 
-Section: A
+BUILD FAILED in 25s

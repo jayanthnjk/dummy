@@ -1,3 +1,33 @@
-ssh -i ~/ksp-key.pem ec2-user@<EC2-IP>
+scp -i ~/ksp-key.pem ~/Desktop/dump.sql ec2-user@35.173.8.76:/tmp/dump.sql
 
-psql "host=ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com port=5432 dbname=ksp_workboard user=ksp_admin sslmode=require" -c "ALTER TABLE users DROP CONSTRAINT users_role_check; ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('ADMIN', 'HIGHER_OFFICER', 'GENERAL_USER', 'SUPPORT_ADMIN'));"
+
+ssh -i ~/ksp-key.pem ec2-user@35.173.8.76
+
+
+
+# Drop the old database
+psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d postgres -c "DROP DATABASE IF EXISTS ksp_workboard;"
+
+# Recreate empty database
+psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d postgres -c "CREATE DATABASE ksp_workboard;"
+
+# Enable pgvector extension
+psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d ksp_workboard -c "CREATE EXTENSION IF NOT EXISTS vector;"
+
+
+
+psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d ksp_workboard -f /tmp/dump.sql
+psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d ksp_workboard -c "\dt"
+psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d ksp_workboard -c "SELECT COUNT(*) FROM personnel;"
+sudo systemctl restart ksp-backend
+rm /tmp/dump.sql
+exit
+
+
+
+
+# Kill active connections first
+psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='ksp_workboard' AND pid <> pg_backend_pid();"
+
+# Then retry the DROP
+psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d postgres -c "DROP DATABASE ksp_workboard;"

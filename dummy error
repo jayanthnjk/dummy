@@ -31,3 +31,23 @@ psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d po
 
 # Then retry the DROP
 psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d postgres -c "DROP DATABASE ksp_workboard;"
+
+
+
+
+
+
+// Map section names to IDs — check the section letter after "Section " prefix
+        String upper = value.toUpperCase().trim();
+        if (upper.equals("SECTION C") || upper.equals("C")) return 3L;
+        if (upper.equals("SECTION D") || upper.equals("D")) return 4L;
+        if (upper.equals("SECTION E") || upper.equals("E")) return 5L;
+        if (upper.equals("SECTION F") || upper.equals("F")) return 6L;
+        if (upper.equals("SECTION G") || upper.equals("G")) return 7L;
+
+        // Try matching last character as section letter
+        if (upper.endsWith("C")) return 3L;
+        if (upper.endsWith("D")) return 4L;
+        if (upper.endsWith("E")) return 5L;
+        if (upper.endsWith("F")) return 6L;
+        if (upper.endsWith("G")) return 7L;

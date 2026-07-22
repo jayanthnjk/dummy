@@ -52,3 +52,45 @@ $ bash deploy/aws/deploy.sh 35.173.8.76
 ksp-workboard-0.0.1-SNAPSHOT.jar                          0%  255KB   0.0KB/s - stalled -
 
 ksp-workboard-0.0.1-SNAPSHOT.jar                          0%  255KB   0.0KB/s - stalled -
+
+
+
+
+
+
+
+The SCP upload is stalling — this is a network/connectivity issue with your EC2 instance. Here's what to check and try:
+
+1. First, cancel the current stuck transfer: Press Ctrl+C in the terminal.
+
+2. Check if you can even SSH to the instance:
+
+ssh -i ~/ksp-key.pem -o StrictHostKeyChecking=no -o ConnectTimeout=10 ec2-user@35.173.8.76 "echo connected"
+3. Common causes and fixes:
+
+EC2 Security Group not allowing inbound SSH (port 22):
+
+Go to AWS Console → EC2 → your instance → Security → Security Groups
+Ensure inbound rule allows port 22 from your current IP
+Your corporate network/VPN is blocking or throttling SCP:
+
+BT corporate networks often block or throttle SSH/SCP traffic
+Try disconnecting from VPN if you're on one
+Or try using a personal hotspot to test
+EC2 instance might be overloaded or out of disk space:
+
+ssh -i ~/ksp-key.pem ec2-user@35.173.8.76 "df -h"
+4. If SSH works but SCP is slow, try compressing first:
+
+# Compress the JAR before uploading
+gzip -k backend/build/libs/ksp-workboard-0.0.1-SNAPSHOT.jar
+
+# Upload compressed file (smaller = faster)
+scp -i ~/ksp-key.pem -o StrictHostKeyChecking=no -C backend/build/libs/ksp-workboard-0.0.1-SNAPSHOT.jar.gz ec2-user@35.173.8.76:/opt/ksp/
+
+# Decompress on server
+ssh -i ~/ksp-key.pem ec2-user@35.173.8.76 "cd /opt/ksp && gunzip -f ksp-workboard-0.0.1-SNAPSHOT.jar.gz && mv ksp-workboard-0.0.1-SNAPSHOT.jar ksp-workboard.jar && sudo systemctl restart ksp-backend"
+5. Alternative: use rsync with progress (better for slow connections):
+
+rsync -avz --progress -e "ssh -i ~/ksp-key.pem" backend/build/libs/ksp-workboard-0.0.1-SNAPSHOT.jar ec2-user@35.173.8.76:/opt/ksp/ksp-workboard.jar
+Most likely cause given you're on a BT corporate machine: your network is throttling the SCP transfer. Try a different network or VPN-off first.

@@ -37,17 +37,18 @@ psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -U ksp_admin -d po
 
 
 
-// Map section names to IDs — check the section letter after "Section " prefix
-        String upper = value.toUpperCase().trim();
-        if (upper.equals("SECTION C") || upper.equals("C")) return 3L;
-        if (upper.equals("SECTION D") || upper.equals("D")) return 4L;
-        if (upper.equals("SECTION E") || upper.equals("E")) return 5L;
-        if (upper.equals("SECTION F") || upper.equals("F")) return 6L;
-        if (upper.equals("SECTION G") || upper.equals("G")) return 7L;
+jayan@JayanthNjk MINGW64 /d/workspace/ksp/car-z1/backend
+$ bash deploy/aws/deploy.sh 35.173.8.76
+=========================================
+  KSP Workboard - Full Deploy
+=========================================
 
-        // Try matching last character as section letter
-        if (upper.endsWith("C")) return 3L;
-        if (upper.endsWith("D")) return 4L;
-        if (upper.endsWith("E")) return 5L;
-        if (upper.endsWith("F")) return 6L;
-        if (upper.endsWith("G")) return 7L;
+[1/6] Building backend JAR...
+  ✓ JAR built: /d/workspace/ksp/car-z1/backend/build/libs/ksp-workboard-0.0.1-SNAPSHOT.jar
+[2/6] Uploading JAR to EC2 (35.173.8.76)...
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+ksp-workboard-0.0.1-SNAPSHOT.jar                          0%  255KB   0.0KB/s - stalled -
+
+ksp-workboard-0.0.1-SNAPSHOT.jar                          0%  255KB   0.0KB/s - stalled -

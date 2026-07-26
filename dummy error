@@ -1,3 +1,0 @@
-ssh -i ~/ksp-key.pem ec2-user@<EC2-IP>
-
-psql "host=ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com port=5432 dbname=ksp_workboard user=ksp_admin sslmode=require" -c "ALTER TABLE users DROP CONSTRAINT users_role_check; ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('ADMIN', 'HIGHER_OFFICER', 'GENERAL_USER', 'SUPPORT_ADMIN'));"

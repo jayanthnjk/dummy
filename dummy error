@@ -14,3 +14,7 @@ psql "host=ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com port=5432 dbnam
         "timestamp": "2026-07-27T16:44:33"
     }
 }
+
+
+pending execute 
+psql "host=ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com port=5432 dbname=ksp_workboard user=ksp_admin sslmode=require" -c "ALTER TABLE leave_requests ALTER COLUMN end_date DROP NOT NULL;"

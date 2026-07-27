@@ -4,3 +4,13 @@ psql "host=ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com port=5432 dbnam
 
 
 psql "host=ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com port=5432 dbname=ksp_workboard user=ksp_admin sslmode=require" -c "ALTER TABLE leave_requests DROP CONSTRAINT IF EXISTS leave_requests_leave_type_check;"
+
+
+
+{
+    "error": {
+        "code": "CONFLICT",
+        "message": "Overlapping leave request exists",
+        "timestamp": "2026-07-27T16:44:33"
+    }
+}

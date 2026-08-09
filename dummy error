@@ -101,3 +101,8 @@ The scheduler is running at all
 Emails are being attempted but failing
 There's an SES/SMTP configuration issue
 The cron schedule is incorrect
+
+
+
+
+psql "host=ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com port=5432 dbname=ksp_workboard user=ksp_admin sslmode=require" -c "ALTER TABLE personnel ADD COLUMN type_of_vehicle VARCHAR(100);"

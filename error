@@ -1,22 +1,43 @@
-The issue is the build.gradle .env parsing. It uses a basic line parser. Check if your .env file at 
-.env
- has the correct content. The problem could be:
+You need to SSH into your EC2 instance, run pg_dump, then download the file. Here are the steps:
 
-BOM characters — if the file was saved with UTF-8 BOM, the first variable gets corrupted
-Windows line endings — the parser splits on = but the values might have trailing \r
-Run this in PowerShell to verify what's actually in the file:
+Option 1: SSH in and dump, then download
 
 powershell
 
-Get-Content "D:\workspace\ksp\KSP\backend\.env" | ForEach-Object { "[$_]" }
-If the GROQ_API_KEY line shows correctly, the issue is likely the Gradle .env loader. Try passing it directly as an environment variable:
+# 1. SSH into your EC2
+ssh -i your-key.pem ec2-user@your-ec2-ip
+
+# 2. On the EC2, create the dump
+pg_dump -U postgres -d postgres -F p -f /tmp/backup.sql
+
+# 3. Exit SSH
+exit
+
+# 4. Download the file to your local machine
+scp -i your-key.pem ec2-user@your-ec2-ip:/tmp/backup.sql D:\workspace\ksp\backup.sql
+Option 2: One-liner from local (dump directly via SSH tunnel)
 
 powershell
 
-$env:GROQ_API_KEY="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"; .\gradlew.bat bootRun
-If that works, then your .env file has an encoding issue. Recreate it with no BOM:
+# Create SSH tunnel to RDS/PostgreSQL on EC2
+ssh -i your-key.pem -L 5433:localhost:5432 ec2-user@your-ec2-ip
+
+# In another terminal, dump via the tunnel
+pg_dump -h localhost -p 5433 -U postgres -d postgres -F p -f D:\workspace\ksp\backup.sql
+Option 3: If PostgreSQL is on the EC2 itself (not RDS)
 
 powershell
 
-[System.IO.File]::WriteAllText("D:\workspace\ksp\KSP\backend\.env", "DB_URL=jdbc:postgresql://localhost:5432/postgres`nDB_USERNAME=postgres`nDB_PASSWORD=postgres`nJWT_SECRET=ksp-local-dev-secret-key-minimum-32-characters-long-for-hs256`nAI_PROVIDER=groq`nGROQ_API_KEY=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`nSPRING_PROFILES_ACTIVE=local`nEMAIL_ENABLED=false`n")
-Elapsed time: 17s
+# Single command: SSH + pg_dump + pipe to local file
+ssh -i your-key.pem ec2-user@your-ec2-ip "pg_dump -U postgres -d postgres" > D:\workspace\ksp\backup.sql
+Replace:
+
+your-key.pem → your actual SSH key file path
+your-ec2-ip → your EC2 public IP or DNS
+postgres → your actual DB name (from your prod .env it uses $DB_URL)
+If you're using AWS RDS instead of PostgreSQL on EC2, you'd connect to the RDS endpoint from the EC2 instance:
+
+bash
+
+pg_dump -h your-rds-endpoint.rds.amazonaws.com -U postgres -d your_db_name -F p -f /tmp/backup.sql
+Elapsed time: 13s

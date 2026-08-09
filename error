@@ -1,280 +1,466 @@
-package com.policescheduler.service;
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  FormControl,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import PersonSearchIcon from '@mui/icons-material/PersonSearch';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import PageHeader from '@/components/common/PageHeader';
+import api from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
 
-import com.policescheduler.dto.*;
-import com.policescheduler.entity.LeaveRequest;
-import com.policescheduler.entity.Personnel;
-import com.policescheduler.entity.User;
-import com.policescheduler.entity.CycleDutyAssignment;
-import com.policescheduler.repository.CycleDutyAssignmentRepository;
-import com.policescheduler.repository.LeaveRequestRepository;
-import com.policescheduler.repository.PersonnelRepository;
-import com.policescheduler.repository.UserRepository;
-import jakarta.persistence.EntityNotFoundException;
-import jakarta.persistence.criteria.Predicate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+const DESIGNATIONS = ['', 'DCP', 'ACP', 'RPI', 'RSI', 'ARSI', 'AHC', 'APC'];
+const UNITS = ['', 'CAR', 'MT'];
 
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
-@Service
-public class LeaveService {
-
-    private static final Logger log = LoggerFactory.getLogger(LeaveService.class);
-
-    private final LeaveRequestRepository leaveRequestRepository;
-    private final PersonnelRepository personnelRepository;
-    private final UserRepository userRepository;
-    private final CycleDutyAssignmentRepository cycleDutyAssignmentRepository;
-
-    public LeaveService(LeaveRequestRepository leaveRequestRepository,
-                        PersonnelRepository personnelRepository,
-                        UserRepository userRepository,
-                        CycleDutyAssignmentRepository cycleDutyAssignmentRepository) {
-        this.leaveRequestRepository = leaveRequestRepository;
-        this.personnelRepository = personnelRepository;
-        this.userRepository = userRepository;
-        this.cycleDutyAssignmentRepository = cycleDutyAssignmentRepository;
-    }
-
-    public Page<LeaveRequestDto> listRequests(LeaveFilter filter, Pageable pageable,
-                                               String username, String role) {
-        Specification<LeaveRequest> spec = buildSpecification(filter, username, role);
-        return leaveRequestRepository.findAll(spec, pageable).map(this::toDto);
-    }
-
-    @Transactional
-    public LeaveRequestDto submit(CreateLeaveRequest request) {
-        Personnel personnel = personnelRepository.findById(request.getPersonnelId())
-                .orElseThrow(() -> new EntityNotFoundException("Personnel not found: " + request.getPersonnelId()));
-
-        // Allow all leave types to be submitted without end date (open-ended leave)
-        // End date can be added later using closeLeave endpoint
-
-        // For overlap check: if endDate is null (open-ended leave), use a far-future date for query
-        LocalDate overlapCheckEnd = request.getEndDate() != null ? request.getEndDate() : LocalDate.of(2099, 12, 31);
-        List<LeaveRequest> overlapping = leaveRequestRepository.findOverlapping(
-                request.getPersonnelId(), request.getStartDate(), overlapCheckEnd);
-        if (!overlapping.isEmpty()) {
-            throw new IllegalStateException("Overlapping leave request exists");
-        }
-
-        LeaveRequest leave = new LeaveRequest();
-        leave.setPersonnelId(request.getPersonnelId());
-        leave.setLeaveType(request.getLeaveType());
-        leave.setStartDate(request.getStartDate());
-        leave.setEndDate(request.getEndDate()); // null for open-ended leave
-        leave.setReason(request.getReason());
-        leave.setStatus("APPROVED");
-
-        LeaveRequest saved = leaveRequestRepository.save(leave);
-        log.info("Leave request auto-approved for personnel ID: {}, type: {}, endDate: {}",
-                request.getPersonnelId(), request.getLeaveType(), request.getEndDate() != null ? request.getEndDate() : "OPEN-ENDED");
-        return toDto(saved);
-    }
-
-    /**
-     * Close an open-ended leave by setting the end date
-     */
-    @Transactional
-    public LeaveRequestDto closeLeave(Long id, LocalDate endDate, String comments) {
-        LeaveRequest leave = leaveRequestRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Leave request not found: " + id));
-
-        if (leave.getEndDate() != null) {
-            throw new IllegalStateException("Leave request already has an end date");
-        }
-
-        if (!"APPROVED".equals(leave.getStatus())) {
-            throw new IllegalStateException("Only approved leaves can be closed");
-        }
-
-        if (endDate.isBefore(leave.getStartDate())) {
-            throw new IllegalArgumentException("End date cannot be before start date");
-        }
-
-        leave.setEndDate(endDate);
-        // Append closing comments to existing reason
-        if (comments != null && !comments.isBlank()) {
-            String existingReason = leave.getReason() != null ? leave.getReason() : "";
-            String newReason = existingReason.isBlank() 
-                ? "Closed: " + comments 
-                : existingReason + " | Closed: " + comments;
-            leave.setReason(newReason);
-        }
-
-        LeaveRequest saved = leaveRequestRepository.save(leave);
-        log.info("Leave request {} closed with end date: {}", id, endDate);
-        return toDto(saved);
-    }
-
-    @Transactional
-    public LeaveRequestDto approve(Long id, String approverUsername) {
-        LeaveRequest leave = leaveRequestRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Leave request not found: " + id));
-
-        if (!"PENDING".equals(leave.getStatus())) {
-            throw new IllegalStateException("Leave request already processed");
-        }
-
-        User approver = userRepository.findByUsername(approverUsername)
-                .orElseThrow(() -> new EntityNotFoundException("Approver not found"));
-
-        leave.setStatus("APPROVED");
-        leave.setApprovedBy(approver.getId());
-        LeaveRequest saved = leaveRequestRepository.save(leave);
-        log.info("Leave request {} approved by {}", id, approverUsername);
-        return toDto(saved);
-    }
-
-    @Transactional
-    public LeaveRequestDto reject(Long id, String approverUsername, String reason) {
-        LeaveRequest leave = leaveRequestRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Leave request not found: " + id));
-
-        if (!"PENDING".equals(leave.getStatus())) {
-            throw new IllegalStateException("Leave request already processed");
-        }
-
-        User approver = userRepository.findByUsername(approverUsername)
-                .orElseThrow(() -> new EntityNotFoundException("Approver not found"));
-
-        leave.setStatus("REJECTED");
-        leave.setApprovedBy(approver.getId());
-        leave.setRejectionReason(reason);
-        LeaveRequest saved = leaveRequestRepository.save(leave);
-        log.info("Leave request {} rejected by {}", id, approverUsername);
-        return toDto(saved);
-    }
-
-    @Transactional
-    public LeaveRequestDto cancel(Long id, String username) {
-        LeaveRequest leave = leaveRequestRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Leave request not found: " + id));
-
-        // Only REJECTED or already CANCELLED leaves cannot be cancelled
-        if ("REJECTED".equals(leave.getStatus()) || "CANCELLED".equals(leave.getStatus())) {
-            throw new IllegalStateException("Leave request cannot be cancelled");
-        }
-
-        leave.setStatus("CANCELLED");
-        LeaveRequest saved = leaveRequestRepository.save(leave);
-        log.info("Leave request {} cancelled by {}", id, username);
-        return toDto(saved);
-    }
-
-    private Specification<LeaveRequest> buildSpecification(LeaveFilter filter, String username, String role) {
-        return (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-
-            // Role-based filtering
-            if ("GENERAL_USER".equals(role)) {
-                User user = userRepository.findByUsername(username).orElse(null);
-                if (user != null && user.getUnits() != null && !user.getUnits().isBlank()) {
-                    // Show leave requests for all personnel in the user's unit(s)
-                    String units = user.getUnits();
-                    // Get all personnel IDs for the user's unit(s)
-                    List<Long> unitPersonnelIds = new ArrayList<>();
-                    if (units.contains("CAR")) {
-                        personnelRepository.findAll().stream()
-                            .filter(p -> p.getIsActive() != null && p.getIsActive())
-                            .filter(p -> !"MT".equalsIgnoreCase(p.getUnit()))
-                            .forEach(p -> unitPersonnelIds.add(p.getId()));
-                    }
-                    if (units.contains("MT")) {
-                        personnelRepository.findAll().stream()
-                            .filter(p -> p.getIsActive() != null && p.getIsActive())
-                            .filter(p -> "MT".equalsIgnoreCase(p.getUnit()))
-                            .forEach(p -> unitPersonnelIds.add(p.getId()));
-                    }
-                    if (!unitPersonnelIds.isEmpty()) {
-                        predicates.add(root.get("personnelId").in(unitPersonnelIds));
-                    } else {
-                        predicates.add(cb.equal(root.get("personnelId"), -1L)); // no results
-                    }
-                } else {
-                    predicates.add(cb.equal(root.get("personnelId"), -1L)); // no results
-                }
-            }
-            // HIGHER_OFFICER and ADMIN see all
-
-            if (filter != null) {
-                if (filter.getStatus() != null && !filter.getStatus().isBlank()) {
-                    predicates.add(cb.equal(root.get("status"), filter.getStatus()));
-                }
-                if (filter.getLeaveType() != null && !filter.getLeaveType().isBlank()) {
-                    predicates.add(cb.equal(root.get("leaveType"), filter.getLeaveType()));
-                }
-                if (filter.getPersonnelId() != null) {
-                    predicates.add(cb.equal(root.get("personnelId"), filter.getPersonnelId()));
-                }
-                if (filter.getStartDate() != null) {
-                    predicates.add(cb.greaterThanOrEqualTo(root.get("startDate"), filter.getStartDate()));
-                }
-                if (filter.getEndDate() != null) {
-                    predicates.add(cb.lessThanOrEqualTo(root.get("endDate"), filter.getEndDate()));
-                }
-            }
-
-            // Default sort by startDate descending (latest first)
-            if (query != null) {
-                query.orderBy(cb.desc(root.get("startDate")), cb.desc(root.get("id")));
-            }
-
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-    }
-
-    private LeaveRequestDto toDto(LeaveRequest lr) {
-        Personnel p = personnelRepository.findById(lr.getPersonnelId()).orElse(null);
-        return LeaveRequestDto.builder()
-                .id(lr.getId())
-                .personnelId(lr.getPersonnelId())
-                .personnelName(p != null ? p.getPersonName() : null)
-                .badgeId(p != null ? p.getBadgeId() : null)
-                .leaveType(lr.getLeaveType())
-                .startDate(lr.getStartDate())
-                .endDate(lr.getEndDate())
-                .status(lr.getStatus())
-                .reason(lr.getReason())
-                .approvedBy(lr.getApprovedBy())
-                .rejectionReason(lr.getRejectionReason())
-                .createdAt(lr.getCreatedAt())
-                .updatedAt(lr.getUpdatedAt())
-                .build();
-    }
-
-    /**
-     * Finds duty assignments that conflict with the given leave dates for a person.
-     * Returns a list of conflict details including assignmentId, date, dutyName, and platoonId.
-     * For open-ended leaves (endDate is null), only checks the start date.
-     */
-    public List<Map<String, Object>> findDutyConflicts(Long personnelId, LocalDate startDate, LocalDate endDate) {
-        List<Map<String, Object>> conflicts = new ArrayList<>();
-        
-        // For open-ended leaves, only check the start date for conflicts
-        LocalDate checkEndDate = endDate != null ? endDate : startDate;
-        
-        LocalDate current = startDate;
-        while (!current.isAfter(checkEndDate)) {
-            List<CycleDutyAssignment> dayAssignments = cycleDutyAssignmentRepository.findByPersonIdAndDate(personnelId, current);
-            for (CycleDutyAssignment assignment : dayAssignments) {
-                Map<String, Object> conflict = new java.util.LinkedHashMap<>();
-                conflict.put("assignmentId", assignment.getId());
-                conflict.put("date", assignment.getDate().toString());
-                conflict.put("dutyName", assignment.getShiftType());
-                conflict.put("platoonId", assignment.getPlatoonId());
-                conflicts.add(conflict);
-            }
-            current = current.plusDays(1);
-        }
-        return conflicts;
-    }
+interface DailyRecord {
+  date: string;
+  dutyType: string | null;
+  dutyLocation: string | null;
+  adhocDuty: string | null;
+  leaveType: string | null;
+  shiftType: string | null;
+  status: string | null;
 }
+
+interface RosterPerson {
+  personId: number;
+  badgeId: string;
+  personName: string;
+  designation: string;
+  dailyRecords: DailyRecord[];
+}
+
+/**
+ * Formats a duty cell text from a daily record.
+ * Priority: leaveType > adhocDuty > dutyLocation > dutyType > '-'
+ */
+function getDutyCellText(record: DailyRecord | undefined): string {
+  if (!record) return '-';
+  if (record.leaveType) return record.leaveType.replace(/_/g, ' ');
+  if (record.adhocDuty) return record.adhocDuty;
+  if (record.dutyLocation) return record.dutyLocation;
+  if (record.dutyType) return record.dutyType;
+  return '-';
+}
+
+function getDutyCellColor(record: DailyRecord | undefined): string {
+  if (!record) return '#e5e7eb';
+  if (record.leaveType) return '#fef3c7'; // yellow for leave
+  if (record.adhocDuty) return '#dbeafe'; // blue for adhoc
+  return '#ffffff';
+}
+
+/**
+ * Generate array of date strings between start and end (inclusive).
+ */
+function getDateRange(start: string, end: string): string[] {
+  const dates: string[] = [];
+  const current = new Date(start);
+  const endDate = new Date(end);
+  while (current <= endDate) {
+    dates.push(current.toISOString().split('T')[0]);
+    current.setDate(current.getDate() + 1);
+  }
+  return dates;
+}
+
+/**
+ * Gets current week's Monday and Sunday dates.
+ */
+function getCurrentWeekRange(): { start: string; end: string } {
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ...
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return {
+    start: monday.toISOString().split('T')[0],
+    end: sunday.toISOString().split('T')[0],
+  };
+}
+
+const DailyRosterPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { isAdmin, isCAROnly, isMTOnly } = useAuth();
+
+  // Default to current week
+  const currentWeek = getCurrentWeekRange();
+
+  // Filter state
+  const [startDate, setStartDate] = useState(currentWeek.start);
+  const [endDate, setEndDate] = useState(currentWeek.end);
+  const [designation, setDesignation] = useState('');
+  const [unit, setUnit] = useState(isCAROnly ? 'CAR' : isMTOnly ? 'MT' : '');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Data state
+  const [roster, setRoster] = useState<RosterPerson[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [searched, setSearched] = useState(false);
+
+  const fetchRoster = useCallback(async () => {
+    if (!startDate || !endDate) return;
+    setLoading(true);
+    setError('');
+    try {
+      const params: Record<string, string> = { startDate, endDate };
+      if (designation) params.designation = designation;
+      if (unit) params.unit = unit;
+      const res = await api.get<RosterPerson[]>('/api/duty-history/roster', { params });
+      setRoster(res.data);
+      setSearched(true);
+    } catch {
+      setError('Failed to load roster data');
+      setRoster([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [startDate, endDate, designation, unit]);
+
+  // Auto-load current week on mount
+  useEffect(() => {
+    fetchRoster();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const dates = startDate && endDate ? getDateRange(startDate, endDate) : [];
+
+  // Limit date range to max 31 days
+  const dateRangeValid = dates.length > 0 && dates.length <= 31;
+  const canSearch = !!startDate && !!endDate && dateRangeValid;
+
+  // Filter roster by search query (name or badge)
+  const filteredRoster = useMemo(() => {
+    if (!searchQuery.trim()) return roster;
+    const q = searchQuery.toLowerCase().trim();
+    return roster.filter(
+      (p) =>
+        (p.personName && p.personName.toLowerCase().includes(q)) ||
+        (p.badgeId && p.badgeId.toLowerCase().includes(q))
+    );
+  }, [roster, searchQuery]);
+
+  return (
+    <Box sx={{ p: 3 }}>
+      {/* Header */}
+      <Box sx={{ mb: 3 }}>
+        <PageHeader
+          title="Daily Roster"
+          breadcrumbs={[
+            { label: 'Home', path: '/' },
+            { label: t('nav.personnel', 'Personnel'), path: '/personnel' },
+            { label: 'Daily Roster' },
+          ]}
+          actions={[
+            {
+              label: 'Back to Personnel',
+              variant: 'ghost',
+              icon: <ArrowBackIcon />,
+              onClick: () => navigate('/personnel'),
+            },
+          ]}
+        />
+      </Box>
+
+      {/* Filters */}
+      <Paper sx={{ p: 2.5, mb: 3 }}>
+        <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
+          Filters
+        </Typography>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="flex-end">
+          <TextField
+            type="date"
+            label="Start Date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            size="small"
+            sx={{ minWidth: 160 }}
+          />
+          <TextField
+            type="date"
+            label="End Date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            size="small"
+            sx={{ minWidth: 160 }}
+          />
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Designation</InputLabel>
+            <Select
+              value={designation}
+              label="Designation"
+              onChange={(e) => setDesignation(e.target.value)}
+            >
+              <MenuItem value="">All</MenuItem>
+              {DESIGNATIONS.filter(Boolean).map((d) => (
+                <MenuItem key={d} value={d}>{d}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Unit</InputLabel>
+            <Select
+              value={unit}
+              label="Unit"
+              onChange={(e) => setUnit(e.target.value)}
+              disabled={!isAdmin}
+            >
+              <MenuItem value="">All</MenuItem>
+              {UNITS.filter(Boolean).map((u) => (
+                <MenuItem key={u} value={u}>{u}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button
+            variant="contained"
+            startIcon={<SearchIcon />}
+            onClick={fetchRoster}
+            disabled={!canSearch || loading}
+            sx={{ height: 40 }}
+          >
+            {loading ? <CircularProgress size={20} /> : 'Load Roster'}
+          </Button>
+        </Stack>
+        {startDate && endDate && !dateRangeValid && (
+          <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+            Date range must be 31 days or less.
+          </Typography>
+        )}
+      </Paper>
+
+      {/* Error */}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+      {/* Results */}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {!loading && searched && roster.length === 0 && (
+        <Alert severity="info">No duty history records found for the selected filters.</Alert>
+      )}
+
+      {!loading && roster.length > 0 && (
+        <Paper sx={{ overflow: 'hidden' }}>
+          {/* Top bar: count + search */}
+          <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              {filteredRoster.length} personnel • {dates.length} days
+              {searchQuery && filteredRoster.length !== roster.length && (
+                <Typography component="span" sx={{ fontSize: '0.75rem', color: 'text.secondary', ml: 1 }}>
+                  (filtered from {roster.length})
+                </Typography>
+              )}
+            </Typography>
+            <TextField
+              size="small"
+              placeholder="Search by name or badge..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <PersonSearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ minWidth: 220, maxWidth: 300, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: '0.8rem' } }}
+            />
+          </Box>
+          <TableContainer sx={{ maxHeight: 'calc(100vh - 280px)', overflowX: 'auto', overflowY: 'auto' }}>
+            <Table size="small" stickyHeader sx={{ minWidth: 300 + dates.length * 100 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell
+                    sx={{
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 3,
+                      bgcolor: '#f8fafc',
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      minWidth: 50,
+                      borderRight: '1px solid #e2e8f0',
+                    }}
+                  >
+                    S.No
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      position: 'sticky',
+                      left: 50,
+                      zIndex: 3,
+                      bgcolor: '#f8fafc',
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      minWidth: 180,
+                      borderRight: '1px solid #e2e8f0',
+                    }}
+                  >
+                    Name / Badge
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      position: 'sticky',
+                      left: 230,
+                      zIndex: 3,
+                      bgcolor: '#f8fafc',
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      minWidth: 70,
+                      borderRight: '2px solid #cbd5e1',
+                    }}
+                  >
+                    Desig.
+                  </TableCell>
+                  {dates.map((date) => {
+                    const d = new Date(date);
+                    const day = d.getDate();
+                    const month = d.toLocaleString('en', { month: 'short' });
+                    const weekday = d.toLocaleString('en', { weekday: 'short' });
+                    const isSunday = d.getDay() === 0;
+                    return (
+                      <TableCell
+                        key={date}
+                        align="center"
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: '0.68rem',
+                          minWidth: 100,
+                          maxWidth: 120,
+                          bgcolor: isSunday ? '#fef2f2' : '#f8fafc',
+                          borderRight: '1px solid #e2e8f0',
+                          whiteSpace: 'nowrap',
+                          px: 0.5,
+                        }}
+                      >
+                        <Box>{weekday.toUpperCase()}</Box>
+                        <Box sx={{ fontWeight: 700, fontSize: '0.8rem' }}>{day} {month.toUpperCase()}</Box>
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredRoster.map((person, idx) => {
+                  // Build a map of date -> record for this person
+                  const recordMap: Record<string, DailyRecord> = {};
+                  person.dailyRecords.forEach((r) => {
+                    recordMap[r.date] = r;
+                  });
+
+                  return (
+                    <TableRow key={person.personId} hover>
+                      <TableCell
+                        sx={{
+                          position: 'sticky',
+                          left: 0,
+                          zIndex: 1,
+                          bgcolor: '#fff',
+                          fontSize: '0.75rem',
+                          borderRight: '1px solid #e2e8f0',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {idx + 1}
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          position: 'sticky',
+                          left: 50,
+                          zIndex: 1,
+                          bgcolor: '#fff',
+                          fontSize: '0.75rem',
+                          borderRight: '1px solid #e2e8f0',
+                        }}
+                      >
+                        <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, lineHeight: 1.2 }}>
+                          {person.personName}
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.68rem', color: '#6b7280' }}>
+                          {person.badgeId || '—'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          position: 'sticky',
+                          left: 230,
+                          zIndex: 1,
+                          bgcolor: '#fff',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          borderRight: '2px solid #cbd5e1',
+                        }}
+                      >
+                        {person.designation || '—'}
+                      </TableCell>
+                      {dates.map((date) => {
+                        const record = recordMap[date];
+                        const cellText = getDutyCellText(record);
+                        const bgColor = getDutyCellColor(record);
+                        const isSunday = new Date(date).getDay() === 0;
+
+                        return (
+                          <Tooltip key={date} title={cellText} enterDelay={200} arrow>
+                            <TableCell
+                              align="center"
+                              sx={{
+                                fontSize: '0.65rem',
+                                px: 0.5,
+                                py: 0.5,
+                                minWidth: 100,
+                                maxWidth: 120,
+                                bgcolor: isSunday ? '#fef7f7' : bgColor,
+                                borderRight: '1px solid #f1f5f9',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {cellText.length > 15 ? cellText.substring(0, 15) + '...' : cellText}
+                            </TableCell>
+                          </Tooltip>
+                        );
+                      })}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
+    </Box>
+  );
+};
+
+export default DailyRosterPage;

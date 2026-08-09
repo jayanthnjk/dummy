@@ -1,15 +1,280 @@
-PGPASSWORD=ksp_admin_123 psql -h localhost -U ksp_admin -d postgres -c "CREATE TABLE IF NOT EXISTS leave_types (id BIGSERIAL PRIMARY KEY, code VARCHAR(100) NOT NULL UNIQUE, display_name VARCHAR(200) NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP); INSERT INTO leave_types (code, display_name, sort_order) VALUES ('CASUAL_LEAVE', 'CL (CASUAL LEAVE)', 1), ('COMMUTED_LEAVE', 'CML (COMMUTED LEAVE)', 2), ('PATERNITY_LEAVE', 'PL (PATERNITY LEAVE)', 3), ('EARNED_LEAVE', 'EL (EARNED LEAVE)', 4), ('ABSENT', 'ABSENT', 5), ('SUSPENSION', 'SUSPENSION', 6), ('PERMISSION', 'PERMISSION / RH TO RPI, RSI AND ARSI', 7), ('SICK_LEAVE', 'SICK', 8), ('WEEKLY_OFF', 'WEEKLY OFF', 9) ON CONFLICT (code) DO UPDATE SET display_name = EXCLUDED.display_name, sort_order = EXCLUDED.sort_order, updated_at = CURRENT_TIMESTAMP; ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check; DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'units') THEN ALTER TABLE users ADD COLUMN units VARCHAR(100); END IF; END \$\$; UPDATE users SET units = 'CAR,MT' WHERE role IN ('ADMIN', 'SUPPORT_ADMIN') AND units IS NULL; UPDATE users SET units = 'CAR' WHERE role = 'GENERAL_USER' AND units IS NULL; UPDATE users SET units = 'CAR,MT' WHERE role = 'HIGHER_OFFICER' AND units IS NULL; SELECT * FROM leave_types ORDER BY sort_order; SELECT id, username, role, units FROM users;"
+package com.policescheduler.service;
 
+import com.policescheduler.dto.*;
+import com.policescheduler.entity.LeaveRequest;
+import com.policescheduler.entity.Personnel;
+import com.policescheduler.entity.User;
+import com.policescheduler.entity.CycleDutyAssignment;
+import com.policescheduler.repository.CycleDutyAssignmentRepository;
+import com.policescheduler.repository.LeaveRequestRepository;
+import com.policescheduler.repository.PersonnelRepository;
+import com.policescheduler.repository.UserRepository;
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.criteria.Predicate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-jdbc:postgresql://ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com:5432/ksp_workboard
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
+@Service
+public class LeaveService {
 
-PGPASSWORD=ksp_admin_123 psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -p 5432 -U ksp_admin -d ksp_workboard -c "CREATE TABLE IF NOT EXISTS leave_types (id BIGSERIAL PRIMARY KEY, code VARCHAR(100) NOT NULL UNIQUE, display_name VARCHAR(200) NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP); INSERT INTO leave_types (code, display_name, sort_order) VALUES ('CASUAL_LEAVE', 'CL (CASUAL LEAVE)', 1), ('COMMUTED_LEAVE', 'CML (COMMUTED LEAVE)', 2), ('PATERNITY_LEAVE', 'PL (PATERNITY LEAVE)', 3), ('EARNED_LEAVE', 'EL (EARNED LEAVE)', 4), ('ABSENT', 'ABSENT', 5), ('SUSPENSION', 'SUSPENSION', 6), ('PERMISSION', 'PERMISSION / RH TO RPI, RSI AND ARSI', 7), ('SICK_LEAVE', 'SICK', 8), ('WEEKLY_OFF', 'WEEKLY OFF', 9) ON CONFLICT (code) DO UPDATE SET display_name = EXCLUDED.display_name, sort_order = EXCLUDED.sort_order, updated_at = CURRENT_TIMESTAMP; ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check; DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'units') THEN ALTER TABLE users ADD COLUMN units VARCHAR(100); END IF; END \$\$; UPDATE users SET units = 'CAR,MT' WHERE role IN ('ADMIN', 'SUPPORT_ADMIN') AND units IS NULL; UPDATE users SET units = 'CAR' WHERE role = 'GENERAL_USER' AND units IS NULL; UPDATE users SET units = 'CAR,MT' WHERE role = 'HIGHER_OFFICER' AND units IS NULL; SELECT * FROM leave_types ORDER BY sort_order; SELECT id, username, role, units FROM users;"
+    private static final Logger log = LoggerFactory.getLogger(LeaveService.class);
 
+    private final LeaveRequestRepository leaveRequestRepository;
+    private final PersonnelRepository personnelRepository;
+    private final UserRepository userRepository;
+    private final CycleDutyAssignmentRepository cycleDutyAssignmentRepository;
 
-sudo PGPASSWORD=ksp_admin_123 psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -p 5432 -U ksp_admin -d ksp_workboard -c "CREATE TABLE IF NOT EXISTS leave_types (id BIGSERIAL PRIMARY KEY, code VARCHAR(100) NOT NULL UNIQUE, display_name VARCHAR(200) NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP); INSERT INTO leave_types (code, display_name, sort_order) VALUES ('CASUAL_LEAVE', 'CL (CASUAL LEAVE)', 1), ('COMMUTED_LEAVE', 'CML (COMMUTED LEAVE)', 2), ('PATERNITY_LEAVE', 'PL (PATERNITY LEAVE)', 3), ('EARNED_LEAVE', 'EL (EARNED LEAVE)', 4), ('ABSENT', 'ABSENT', 5), ('SUSPENSION', 'SUSPENSION', 6), ('PERMISSION', 'PERMISSION / RH TO RPI, RSI AND ARSI', 7), ('SICK_LEAVE', 'SICK', 8), ('WEEKLY_OFF', 'WEEKLY OFF', 9) ON CONFLICT (code) DO UPDATE SET display_name = EXCLUDED.display_name, sort_order = EXCLUDED.sort_order, updated_at = CURRENT_TIMESTAMP; ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check; DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'units') THEN ALTER TABLE users ADD COLUMN units VARCHAR(100); END IF; END \$\$; UPDATE users SET units = 'CAR,MT' WHERE role IN ('ADMIN', 'SUPPORT_ADMIN') AND units IS NULL; UPDATE users SET units = 'CAR' WHERE role = 'GENERAL_USER' AND units IS NULL; UPDATE users SET units = 'CAR,MT' WHERE role = 'HIGHER_OFFICER' AND units IS NULL; SELECT * FROM leave_types ORDER BY sort_order; SELECT id, username, role, units FROM users;"
+    public LeaveService(LeaveRequestRepository leaveRequestRepository,
+                        PersonnelRepository personnelRepository,
+                        UserRepository userRepository,
+                        CycleDutyAssignmentRepository cycleDutyAssignmentRepository) {
+        this.leaveRequestRepository = leaveRequestRepository;
+        this.personnelRepository = personnelRepository;
+        this.userRepository = userRepository;
+        this.cycleDutyAssignmentRepository = cycleDutyAssignmentRepository;
+    }
 
+    public Page<LeaveRequestDto> listRequests(LeaveFilter filter, Pageable pageable,
+                                               String username, String role) {
+        Specification<LeaveRequest> spec = buildSpecification(filter, username, role);
+        return leaveRequestRepository.findAll(spec, pageable).map(this::toDto);
+    }
 
+    @Transactional
+    public LeaveRequestDto submit(CreateLeaveRequest request) {
+        Personnel personnel = personnelRepository.findById(request.getPersonnelId())
+                .orElseThrow(() -> new EntityNotFoundException("Personnel not found: " + request.getPersonnelId()));
 
-sudo PGPASSWORD=ksp_admin_123 psql -h ksp-postgres.c27mq2wamxfw.us-east-1.rds.amazonaws.com -p 5432 -U ksp_admin -d ksp_workboard -c "DROP TABLE IF EXISTS leave_types; CREATE TABLE leave_types (id BIGSERIAL PRIMARY KEY, code VARCHAR(100) NOT NULL UNIQUE, display_name VARCHAR(200) NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP); INSERT INTO leave_types (code, display_name, sort_order) VALUES ('CASUAL_LEAVE', 'CL (CASUAL LEAVE)', 1), ('COMMUTED_LEAVE', 'CML (COMMUTED LEAVE)', 2), ('PATERNITY_LEAVE', 'PL (PATERNITY LEAVE)', 3), ('EARNED_LEAVE', 'EL (EARNED LEAVE)', 4), ('ABSENT', 'ABSENT', 5), ('SUSPENSION', 'SUSPENSION', 6), ('PERMISSION', 'PERMISSION / RH TO RPI, RSI AND ARSI', 7), ('SICK_LEAVE', 'SICK', 8), ('WEEKLY_OFF', 'WEEKLY OFF', 9); ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check; DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'units') THEN ALTER TABLE users ADD COLUMN units VARCHAR(100); END IF; END \$\$; UPDATE users SET units = 'CAR,MT' WHERE role IN ('ADMIN', 'SUPPORT_ADMIN') AND units IS NULL; UPDATE users SET units = 'CAR' WHERE role = 'GENERAL_USER' AND units IS NULL; UPDATE users SET units = 'CAR,MT' WHERE role = 'HIGHER_OFFICER' AND units IS NULL; SELECT * FROM leave_types ORDER BY sort_order; SELECT id, username, role, units FROM users;"
+        // Allow all leave types to be submitted without end date (open-ended leave)
+        // End date can be added later using closeLeave endpoint
 
+        // For overlap check: if endDate is null (open-ended leave), use a far-future date for query
+        LocalDate overlapCheckEnd = request.getEndDate() != null ? request.getEndDate() : LocalDate.of(2099, 12, 31);
+        List<LeaveRequest> overlapping = leaveRequestRepository.findOverlapping(
+                request.getPersonnelId(), request.getStartDate(), overlapCheckEnd);
+        if (!overlapping.isEmpty()) {
+            throw new IllegalStateException("Overlapping leave request exists");
+        }
+
+        LeaveRequest leave = new LeaveRequest();
+        leave.setPersonnelId(request.getPersonnelId());
+        leave.setLeaveType(request.getLeaveType());
+        leave.setStartDate(request.getStartDate());
+        leave.setEndDate(request.getEndDate()); // null for open-ended leave
+        leave.setReason(request.getReason());
+        leave.setStatus("APPROVED");
+
+        LeaveRequest saved = leaveRequestRepository.save(leave);
+        log.info("Leave request auto-approved for personnel ID: {}, type: {}, endDate: {}",
+                request.getPersonnelId(), request.getLeaveType(), request.getEndDate() != null ? request.getEndDate() : "OPEN-ENDED");
+        return toDto(saved);
+    }
+
+    /**
+     * Close an open-ended leave by setting the end date
+     */
+    @Transactional
+    public LeaveRequestDto closeLeave(Long id, LocalDate endDate, String comments) {
+        LeaveRequest leave = leaveRequestRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Leave request not found: " + id));
+
+        if (leave.getEndDate() != null) {
+            throw new IllegalStateException("Leave request already has an end date");
+        }
+
+        if (!"APPROVED".equals(leave.getStatus())) {
+            throw new IllegalStateException("Only approved leaves can be closed");
+        }
+
+        if (endDate.isBefore(leave.getStartDate())) {
+            throw new IllegalArgumentException("End date cannot be before start date");
+        }
+
+        leave.setEndDate(endDate);
+        // Append closing comments to existing reason
+        if (comments != null && !comments.isBlank()) {
+            String existingReason = leave.getReason() != null ? leave.getReason() : "";
+            String newReason = existingReason.isBlank() 
+                ? "Closed: " + comments 
+                : existingReason + " | Closed: " + comments;
+            leave.setReason(newReason);
+        }
+
+        LeaveRequest saved = leaveRequestRepository.save(leave);
+        log.info("Leave request {} closed with end date: {}", id, endDate);
+        return toDto(saved);
+    }
+
+    @Transactional
+    public LeaveRequestDto approve(Long id, String approverUsername) {
+        LeaveRequest leave = leaveRequestRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Leave request not found: " + id));
+
+        if (!"PENDING".equals(leave.getStatus())) {
+            throw new IllegalStateException("Leave request already processed");
+        }
+
+        User approver = userRepository.findByUsername(approverUsername)
+                .orElseThrow(() -> new EntityNotFoundException("Approver not found"));
+
+        leave.setStatus("APPROVED");
+        leave.setApprovedBy(approver.getId());
+        LeaveRequest saved = leaveRequestRepository.save(leave);
+        log.info("Leave request {} approved by {}", id, approverUsername);
+        return toDto(saved);
+    }
+
+    @Transactional
+    public LeaveRequestDto reject(Long id, String approverUsername, String reason) {
+        LeaveRequest leave = leaveRequestRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Leave request not found: " + id));
+
+        if (!"PENDING".equals(leave.getStatus())) {
+            throw new IllegalStateException("Leave request already processed");
+        }
+
+        User approver = userRepository.findByUsername(approverUsername)
+                .orElseThrow(() -> new EntityNotFoundException("Approver not found"));
+
+        leave.setStatus("REJECTED");
+        leave.setApprovedBy(approver.getId());
+        leave.setRejectionReason(reason);
+        LeaveRequest saved = leaveRequestRepository.save(leave);
+        log.info("Leave request {} rejected by {}", id, approverUsername);
+        return toDto(saved);
+    }
+
+    @Transactional
+    public LeaveRequestDto cancel(Long id, String username) {
+        LeaveRequest leave = leaveRequestRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Leave request not found: " + id));
+
+        // Only REJECTED or already CANCELLED leaves cannot be cancelled
+        if ("REJECTED".equals(leave.getStatus()) || "CANCELLED".equals(leave.getStatus())) {
+            throw new IllegalStateException("Leave request cannot be cancelled");
+        }
+
+        leave.setStatus("CANCELLED");
+        LeaveRequest saved = leaveRequestRepository.save(leave);
+        log.info("Leave request {} cancelled by {}", id, username);
+        return toDto(saved);
+    }
+
+    private Specification<LeaveRequest> buildSpecification(LeaveFilter filter, String username, String role) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            // Role-based filtering
+            if ("GENERAL_USER".equals(role)) {
+                User user = userRepository.findByUsername(username).orElse(null);
+                if (user != null && user.getUnits() != null && !user.getUnits().isBlank()) {
+                    // Show leave requests for all personnel in the user's unit(s)
+                    String units = user.getUnits();
+                    // Get all personnel IDs for the user's unit(s)
+                    List<Long> unitPersonnelIds = new ArrayList<>();
+                    if (units.contains("CAR")) {
+                        personnelRepository.findAll().stream()
+                            .filter(p -> p.getIsActive() != null && p.getIsActive())
+                            .filter(p -> !"MT".equalsIgnoreCase(p.getUnit()))
+                            .forEach(p -> unitPersonnelIds.add(p.getId()));
+                    }
+                    if (units.contains("MT")) {
+                        personnelRepository.findAll().stream()
+                            .filter(p -> p.getIsActive() != null && p.getIsActive())
+                            .filter(p -> "MT".equalsIgnoreCase(p.getUnit()))
+                            .forEach(p -> unitPersonnelIds.add(p.getId()));
+                    }
+                    if (!unitPersonnelIds.isEmpty()) {
+                        predicates.add(root.get("personnelId").in(unitPersonnelIds));
+                    } else {
+                        predicates.add(cb.equal(root.get("personnelId"), -1L)); // no results
+                    }
+                } else {
+                    predicates.add(cb.equal(root.get("personnelId"), -1L)); // no results
+                }
+            }
+            // HIGHER_OFFICER and ADMIN see all
+
+            if (filter != null) {
+                if (filter.getStatus() != null && !filter.getStatus().isBlank()) {
+                    predicates.add(cb.equal(root.get("status"), filter.getStatus()));
+                }
+                if (filter.getLeaveType() != null && !filter.getLeaveType().isBlank()) {
+                    predicates.add(cb.equal(root.get("leaveType"), filter.getLeaveType()));
+                }
+                if (filter.getPersonnelId() != null) {
+                    predicates.add(cb.equal(root.get("personnelId"), filter.getPersonnelId()));
+                }
+                if (filter.getStartDate() != null) {
+                    predicates.add(cb.greaterThanOrEqualTo(root.get("startDate"), filter.getStartDate()));
+                }
+                if (filter.getEndDate() != null) {
+                    predicates.add(cb.lessThanOrEqualTo(root.get("endDate"), filter.getEndDate()));
+                }
+            }
+
+            // Default sort by startDate descending (latest first)
+            if (query != null) {
+                query.orderBy(cb.desc(root.get("startDate")), cb.desc(root.get("id")));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    private LeaveRequestDto toDto(LeaveRequest lr) {
+        Personnel p = personnelRepository.findById(lr.getPersonnelId()).orElse(null);
+        return LeaveRequestDto.builder()
+                .id(lr.getId())
+                .personnelId(lr.getPersonnelId())
+                .personnelName(p != null ? p.getPersonName() : null)
+                .badgeId(p != null ? p.getBadgeId() : null)
+                .leaveType(lr.getLeaveType())
+                .startDate(lr.getStartDate())
+                .endDate(lr.getEndDate())
+                .status(lr.getStatus())
+                .reason(lr.getReason())
+                .approvedBy(lr.getApprovedBy())
+                .rejectionReason(lr.getRejectionReason())
+                .createdAt(lr.getCreatedAt())
+                .updatedAt(lr.getUpdatedAt())
+                .build();
+    }
+
+    /**
+     * Finds duty assignments that conflict with the given leave dates for a person.
+     * Returns a list of conflict details including assignmentId, date, dutyName, and platoonId.
+     * For open-ended leaves (endDate is null), only checks the start date.
+     */
+    public List<Map<String, Object>> findDutyConflicts(Long personnelId, LocalDate startDate, LocalDate endDate) {
+        List<Map<String, Object>> conflicts = new ArrayList<>();
+        
+        // For open-ended leaves, only check the start date for conflicts
+        LocalDate checkEndDate = endDate != null ? endDate : startDate;
+        
+        LocalDate current = startDate;
+        while (!current.isAfter(checkEndDate)) {
+            List<CycleDutyAssignment> dayAssignments = cycleDutyAssignmentRepository.findByPersonIdAndDate(personnelId, current);
+            for (CycleDutyAssignment assignment : dayAssignments) {
+                Map<String, Object> conflict = new java.util.LinkedHashMap<>();
+                conflict.put("assignmentId", assignment.getId());
+                conflict.put("date", assignment.getDate().toString());
+                conflict.put("dutyName", assignment.getShiftType());
+                conflict.put("platoonId", assignment.getPlatoonId());
+                conflicts.add(conflict);
+            }
+            current = current.plusDays(1);
+        }
+        return conflicts;
+    }
+}

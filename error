@@ -1,295 +1,136 @@
-package com.policescheduler.service;
+src/pages/AssignDutiesPage.tsx:132:78 - error TS2304: Cannot find name 'LEAVE_CATEGORIES'.
 
-import com.lowagie.text.Document;
-import com.lowagie.text.DocumentException;
-import com.lowagie.text.Element;
-import com.lowagie.text.PageSize;
-import com.lowagie.text.Paragraph;
-import com.lowagie.text.Phrase;
-import com.lowagie.text.pdf.PdfPCell;
-import com.lowagie.text.pdf.PdfPTable;
-import com.lowagie.text.pdf.PdfWriter;
-import com.policescheduler.entity.Personnel;
-import com.policescheduler.repository.PersonnelRepository;
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.FillPatternType;
-import org.apache.poi.ss.usermodel.IndexedColors;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.stereotype.Service;
+132   const [selectedLeaveCategory, setSelectedLeaveCategory] = useState<string>(LEAVE_CATEGORIES[0].name);
+                                                                                 ~~~~~~~~~~~~~~~~
 
-import java.awt.Color;
-import java.io.ByteArrayOutputStream;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+src/pages/AssignDutiesPage.tsx:531:13 - error TS2304: Cannot find name 'LEAVE_CATEGORIES'.
 
-/**
- * Service for generating PDF and Excel reports for individual personnel information.
- * Uses the same style patterns as DutyHistoryReportService.
- */
-@Service
-public class PersonnelInfoReportService {
+531         if (LEAVE_CATEGORIES.find(c => c.name === displayName)) {
+                ~~~~~~~~~~~~~~~~
 
-    private final PersonnelRepository personnelRepository;
+src/pages/AssignDutiesPage.tsx:531:35 - error TS7006: Parameter 'c' implicitly has an 'any' type.
 
-    private static final com.lowagie.text.Font TITLE_FONT = new com.lowagie.text.Font(
-            com.lowagie.text.Font.HELVETICA, 14, com.lowagie.text.Font.BOLD);
-    private static final com.lowagie.text.Font SECTION_FONT = new com.lowagie.text.Font(
-            com.lowagie.text.Font.HELVETICA, 11, com.lowagie.text.Font.BOLD, new Color(79, 70, 229));
-    private static final com.lowagie.text.Font LABEL_FONT = new com.lowagie.text.Font(
-            com.lowagie.text.Font.HELVETICA, 9, com.lowagie.text.Font.BOLD, Color.BLACK);
-    private static final com.lowagie.text.Font VALUE_FONT = new com.lowagie.text.Font(
-            com.lowagie.text.Font.HELVETICA, 9, com.lowagie.text.Font.NORMAL, Color.BLACK);
-    private static final com.lowagie.text.Font FOOTER_FONT = new com.lowagie.text.Font(
-            com.lowagie.text.Font.HELVETICA, 7, com.lowagie.text.Font.ITALIC, Color.GRAY);
+531         if (LEAVE_CATEGORIES.find(c => c.name === displayName)) {
+                                      ~
 
-    private static final Color HEADER_BG = new Color(79, 70, 229); // Indigo
-    private static final Color LABEL_BG = new Color(241, 245, 249); // Light gray
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd-MMM-yyyy");
+src/pages/ReportsPage.tsx:50:5 - error TS2741: Property 'id' is missing in type '{ title: string; description: string; endpoint: string; filename: string; excelEndpoint: string; excelFilename: string; icon: React.JSX.Element; color: string; }' but required in type 'ReportCard'.
 
-    public PersonnelInfoReportService(PersonnelRepository personnelRepository) {
-        this.personnelRepository = personnelRepository;
-    }
+ 50     {
+        ~
+ 51       title: t('reports.platoonChartAB', 'Platoon Chart A & B'),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+...
+ 58       color: '#3b82f6',
+    ~~~~~~~~~~~~~~~~~~~~~~~
+ 59     },
+    ~~~~~
 
-    public byte[] generatePdf(String badgeId) {
-        Personnel person = personnelRepository.findByBadgeId(badgeId)
-                .orElseThrow(() -> new IllegalArgumentException("Personnel not found: " + badgeId));
+  src/pages/ReportsPage.tsx:25:3
+    25   id: string;
+         ~~
+    'id' is declared here.
 
-        try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            Document document = new Document(PageSize.A4, 30, 30, 30, 30);
-            PdfWriter.getInstance(document, baos);
-            document.open();
+src/pages/ReportsPage.tsx:60:5 - error TS2741: Property 'id' is missing in type '{ title: string; description: string; endpoint: string; filename: string; excelEndpoint: string; excelFilename: string; icon: React.JSX.Element; color: string; }' but required in type 'ReportCard'.
 
-            // Title
-            Paragraph title = new Paragraph("Personnel Information", TITLE_FONT);
-            title.setAlignment(Element.ALIGN_CENTER);
-            document.add(title);
-            document.add(new Paragraph("\n"));
+ 60     {
+        ~
+ 61       title: t('reports.platoonChartC', 'Platoon Chart C - Rotational Duties'),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+...
+ 68       color: '#059669',
+    ~~~~~~~~~~~~~~~~~~~~~~~
+ 69     },
+    ~~~~~
 
-            // Basic Information Section
-            addSectionTitle(document, "Basic Information");
-            PdfPTable basicTable = createInfoTable();
-            addInfoRow(basicTable, "Badge ID", safe(person.getBadgeId()));
-            addInfoRow(basicTable, "Name", safe(person.getPersonName()));
-            addInfoRow(basicTable, "Designation", safe(person.getDesignation()));
-            addInfoRow(basicTable, "Section", safe(person.getSection()));
-            addInfoRow(basicTable, "Unit", safe(person.getUnit()));
-            addInfoRow(basicTable, "Platoon", person.getPlatoonId() != null ? "Platoon " + person.getPlatoonId() : "-");
-            addInfoRow(basicTable, "Date of Joining", person.getDateOfJoining() != null ? person.getDateOfJoining().format(DATE_FORMATTER) : "-");
-            addInfoRow(basicTable, "Status", person.getIsActive() != null && person.getIsActive() ? "Active" : "Inactive");
-            document.add(basicTable);
-            document.add(new Paragraph("\n"));
+  src/pages/ReportsPage.tsx:25:3
+    25   id: string;
+         ~~
+    'id' is declared here.
 
-            // Personal Details Section
-            addSectionTitle(document, "Personal Details");
-            PdfPTable personalTable = createInfoTable();
-            addInfoRow(personalTable, "Date of Birth", person.getDateOfBirth() != null ? person.getDateOfBirth().format(DATE_FORMATTER) : "-");
-            addInfoRow(personalTable, "Blood Group", safe(person.getBloodGroup()));
-            addInfoRow(personalTable, "Qualification", safe(person.getQualification()));
-            addInfoRow(personalTable, "Native Police Station", safe(person.getNativePoliceStation()));
-            document.add(personalTable);
-            document.add(new Paragraph("\n"));
+src/pages/ReportsPage.tsx:70:5 - error TS2741: Property 'id' is missing in type '{ title: string; description: string; endpoint: string; filename: string; excelEndpoint: string; excelFilename: string; icon: React.JSX.Element; color: string; }' but required in type 'ReportCard'.
 
-            // Contact Details Section
-            addSectionTitle(document, "Contact Details");
-            PdfPTable contactTable = createInfoTable();
-            addInfoRow(contactTable, "Phone Number", safe(person.getPhoneNumber()));
-            addInfoRow(contactTable, "Email", safe(person.getEmail()));
-            addInfoRow(contactTable, "Permanent Address", safe(person.getPermanentAddress()));
-            addInfoRow(contactTable, "Present Address", safe(person.getPresentAddress()));
-            document.add(contactTable);
-            document.add(new Paragraph("\n"));
+ 70     {
+        ~
+ 71       title: t('reports.dailyStatement', 'Daily Statement (Form 168)'),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+...
+ 78       color: '#e8722a',
+    ~~~~~~~~~~~~~~~~~~~~~~~
+ 79     },
+    ~~~~~
 
-            // Duty Details Section
-            addSectionTitle(document, "Duty Details");
-            PdfPTable dutyTable = createInfoTable();
-            addInfoRow(dutyTable, "Duty Type", safe(person.getDutyType()));
-            addInfoRow(dutyTable, "Duty Location", safe(person.getDutyLocation()));
-            addInfoRow(dutyTable, "Location", safe(person.getLocation()));
-            addInfoRow(dutyTable, "Deployed From", safe(person.getDeployedFrom()));
-            document.add(dutyTable);
-            document.add(new Paragraph("\n"));
+  src/pages/ReportsPage.tsx:25:3
+    25   id: string;
+         ~~
+    'id' is declared here.
 
-            // Driver Details (only for MT unit or DRIVER duty type)
-            if ("MT".equalsIgnoreCase(person.getUnit()) || "DRIVER".equalsIgnoreCase(person.getDutyType())) {
-                addSectionTitle(document, "Driver Details");
-                PdfPTable driverTable = createInfoTable();
-                addInfoRow(driverTable, "Vehicle Number", safe(person.getVehicleNumber()));
-                addInfoRow(driverTable, "PDMS", safe(person.getPdms()));
-                addInfoRow(driverTable, "Licence Type", safe(person.getLicenceType()));
-                document.add(driverTable);
-                document.add(new Paragraph("\n"));
-            }
+src/pages/ReportsPage.tsx:80:5 - error TS2741: Property 'id' is missing in type '{ title: string; description: string; endpoint: string; filename: string; excelEndpoint: string; excelFilename: string; icon: React.JSX.Element; color: string; }' but required in type 'ReportCard'.
 
-            // Footer
-            String generated = "Generated on " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd-MMM-yyyy HH:mm"));
-            Paragraph footer = new Paragraph(generated, FOOTER_FONT);
-            footer.setAlignment(Element.ALIGN_RIGHT);
-            document.add(footer);
+ 80     {
+        ~
+ 81       title: t('reports.mtSection', 'MT Section - Nominal Report'),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+...
+ 88       color: '#0891b2',
+    ~~~~~~~~~~~~~~~~~~~~~~~
+ 89     },
+    ~~~~~
 
-            document.close();
-            return baos.toByteArray();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to generate PDF for personnel: " + badgeId, e);
-        }
-    }
+  src/pages/ReportsPage.tsx:25:3
+    25   id: string;
+         ~~
+    'id' is declared here.
 
-    public byte[] generateExcel(String badgeId) {
-        Personnel person = personnelRepository.findByBadgeId(badgeId)
-                .orElseThrow(() -> new IllegalArgumentException("Personnel not found: " + badgeId));
+src/pages/ReportsPage.tsx:90:5 - error TS2741: Property 'id' is missing in type '{ title: string; description: string; endpoint: string; filename: string; excelEndpoint: string; excelFilename: string; icon: React.JSX.Element; color: string; requiresDateRange: true; }' but required in type 'ReportCard'.
 
-        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet("Personnel Info");
+ 90     {
+        ~
+ 91       title: t('reports.leaveStatement', 'Leave Statement'),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+...
+ 99       requiresDateRange: true,
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+100     },
+    ~~~~~
 
-            // Header style (Indigo bg, white text, bold)
-            CellStyle headerStyle = workbook.createCellStyle();
-            org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
-            headerFont.setBold(true);
-            headerFont.setColor(IndexedColors.WHITE.getIndex());
-            headerStyle.setFont(headerFont);
-            headerStyle.setFillForegroundColor(IndexedColors.INDIGO.getIndex());
-            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+  src/pages/ReportsPage.tsx:25:3
+    25   id: string;
+         ~~
+    'id' is declared here.
 
-            // Section header style (bold, indigo text)
-            CellStyle sectionStyle = workbook.createCellStyle();
-            org.apache.poi.ss.usermodel.Font sectionFont = workbook.createFont();
-            sectionFont.setBold(true);
-            sectionFont.setFontHeightInPoints((short) 11);
-            sectionStyle.setFont(sectionFont);
+src/pages/ReportsPage.tsx:101:5 - error TS2741: Property 'id' is missing in type '{ title: string; description: string; endpoint: string; filename: string; excelEndpoint: string; excelFilename: string; icon: React.JSX.Element; color: string; }' but required in type 'ReportCard'.
 
-            // Label style (bold)
-            CellStyle labelStyle = workbook.createCellStyle();
-            org.apache.poi.ss.usermodel.Font labelFont = workbook.createFont();
-            labelFont.setBold(true);
-            labelStyle.setFont(labelFont);
-            labelStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
-            labelStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+101     {
+        ~
+102       title: t('reports.personnelList', 'CITY ARMED RESERVE MANGALURU (C.A.R COMPANY) Personnel List'),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+...
+109       color: '#16a34a',
+    ~~~~~~~~~~~~~~~~~~~~~~~
+110     },
+    ~~~~~
 
-            // Value style (normal)
-            CellStyle valueStyle = workbook.createCellStyle();
-            valueStyle.setWrapText(true);
+  src/pages/ReportsPage.tsx:25:3
+    25   id: string;
+         ~~
+    'id' is declared here.
 
-            int rowNum = 0;
+src/pages/ReportsPage.tsx:111:5 - error TS2741: Property 'id' is missing in type '{ title: string; description: string; endpoint: string; filename: string; excelEndpoint: string; excelFilename: string; icon: React.JSX.Element; color: string; }' but required in type 'ReportCard'.
 
-            // Title
-            org.apache.poi.ss.usermodel.Row titleRow = sheet.createRow(rowNum++);
-            org.apache.poi.ss.usermodel.Cell titleCell = titleRow.createCell(0);
-            titleCell.setCellValue("Personnel Information");
-            titleCell.setCellStyle(headerStyle);
-            org.apache.poi.ss.usermodel.Cell titleCell2 = titleRow.createCell(1);
-            titleCell2.setCellStyle(headerStyle);
-            rowNum++; // blank row
+111     {
+        ~
+112       title: t('reports.completePersonnelList', 'Personnel List'),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+...
+119       color: '#8b5cf6',
+    ~~~~~~~~~~~~~~~~~~~~~~~
+120     },
+    ~~~~~
 
-            // Basic Information
-            rowNum = addExcelSection(sheet, rowNum, "Basic Information", sectionStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Badge ID", safe(person.getBadgeId()), labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Name", safe(person.getPersonName()), labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Designation", safe(person.getDesignation()), labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Section", safe(person.getSection()), labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Unit", safe(person.getUnit()), labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Platoon", person.getPlatoonId() != null ? "Platoon " + person.getPlatoonId() : "-", labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Date of Joining", person.getDateOfJoining() != null ? person.getDateOfJoining().format(DATE_FORMATTER) : "-", labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Status", person.getIsActive() != null && person.getIsActive() ? "Active" : "Inactive", labelStyle, valueStyle);
-            rowNum++; // blank row
+  src/pages/ReportsPage.tsx:25:3
+    25   id: string;
+         ~~
+    'id' is declared here.
 
-            // Personal Details
-            rowNum = addExcelSection(sheet, rowNum, "Personal Details", sectionStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Date of Birth", person.getDateOfBirth() != null ? person.getDateOfBirth().format(DATE_FORMATTER) : "-", labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Blood Group", safe(person.getBloodGroup()), labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Qualification", safe(person.getQualification()), labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Native Police Station", safe(person.getNativePoliceStation()), labelStyle, valueStyle);
-            rowNum++; // blank row
 
-            // Contact Details
-            rowNum = addExcelSection(sheet, rowNum, "Contact Details", sectionStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Phone Number", safe(person.getPhoneNumber()), labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Email", safe(person.getEmail()), labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Permanent Address", safe(person.getPermanentAddress()), labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Present Address", safe(person.getPresentAddress()), labelStyle, valueStyle);
-            rowNum++; // blank row
-
-            // Duty Details
-            rowNum = addExcelSection(sheet, rowNum, "Duty Details", sectionStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Duty Type", safe(person.getDutyType()), labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Duty Location", safe(person.getDutyLocation()), labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Location", safe(person.getLocation()), labelStyle, valueStyle);
-            rowNum = addExcelRow(sheet, rowNum, "Deployed From", safe(person.getDeployedFrom()), labelStyle, valueStyle);
-            rowNum++; // blank row
-
-            // Driver Details (only for MT or DRIVER)
-            if ("MT".equalsIgnoreCase(person.getUnit()) || "DRIVER".equalsIgnoreCase(person.getDutyType())) {
-                rowNum = addExcelSection(sheet, rowNum, "Driver Details", sectionStyle);
-                rowNum = addExcelRow(sheet, rowNum, "Vehicle Number", safe(person.getVehicleNumber()), labelStyle, valueStyle);
-                rowNum = addExcelRow(sheet, rowNum, "PDMS", safe(person.getPdms()), labelStyle, valueStyle);
-                rowNum = addExcelRow(sheet, rowNum, "Licence Type", safe(person.getLicenceType()), labelStyle, valueStyle);
-            }
-
-            // Auto-size columns
-            sheet.setColumnWidth(0, 6000);
-            sheet.setColumnWidth(1, 12000);
-
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            workbook.write(baos);
-            return baos.toByteArray();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to generate Excel for personnel: " + badgeId, e);
-        }
-    }
-
-    // --- PDF Helpers ---
-
-    private void addSectionTitle(Document document, String title) throws DocumentException {
-        Paragraph p = new Paragraph(title, SECTION_FONT);
-        p.setSpacingBefore(6);
-        p.setSpacingAfter(4);
-        document.add(p);
-    }
-
-    private PdfPTable createInfoTable() throws DocumentException {
-        PdfPTable table = new PdfPTable(2);
-        table.setWidthPercentage(100);
-        table.setWidths(new float[]{30, 70});
-        return table;
-    }
-
-    private void addInfoRow(PdfPTable table, String label, String value) {
-        PdfPCell labelCell = new PdfPCell(new Phrase(label, LABEL_FONT));
-        labelCell.setBackgroundColor(LABEL_BG);
-        labelCell.setPadding(6);
-        labelCell.setBorderWidth(0.5f);
-        labelCell.setBorderColor(Color.LIGHT_GRAY);
-        table.addCell(labelCell);
-
-        PdfPCell valueCell = new PdfPCell(new Phrase(value, VALUE_FONT));
-        valueCell.setPadding(6);
-        valueCell.setBorderWidth(0.5f);
-        valueCell.setBorderColor(Color.LIGHT_GRAY);
-        table.addCell(valueCell);
-    }
-
-    // --- Excel Helpers ---
-
-    private int addExcelSection(Sheet sheet, int rowNum, String sectionTitle, CellStyle style) {
-        org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowNum);
-        org.apache.poi.ss.usermodel.Cell cell = row.createCell(0);
-        cell.setCellValue(sectionTitle);
-        cell.setCellStyle(style);
-        return rowNum + 1;
-    }
-
-    private int addExcelRow(Sheet sheet, int rowNum, String label, String value, CellStyle labelStyle, CellStyle valueStyle) {
-        org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowNum);
-        org.apache.poi.ss.usermodel.Cell labelCell = row.createCell(0);
-        labelCell.setCellValue(label);
-        labelCell.setCellStyle(labelStyle);
-        org.apache.poi.ss.usermodel.Cell valueCell = row.createCell(1);
-        valueCell.setCellValue(value);
-        valueCell.setCellStyle(valueStyle);
-        return rowNum + 1;
-    }
-
-    private String safe(String value) {
-        return (value != null && !value.isBlank()) ? value : "-";
-    }
-}
+Found 10 errors.

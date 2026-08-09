@@ -1,43 +1,103 @@
-You need to SSH into your EC2 instance, run pg_dump, then download the file. Here are the steps:
+12:54:07: Executing 'build'…
 
-Option 1: SSH in and dump, then download
 
-powershell
+> Task :compileJava
+D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\dto\CreateSupportTicketRequest.java:24: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private String priority = "MEDIUM";
+                   ^
+D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:169: error: reference to Row is ambiguous
+            Row titleRow = sheet.createRow(rowNum++);
+            ^
+  both interface org.apache.poi.ss.usermodel.Row in org.apache.poi.ss.usermodel and class com.lowagie.text.Row in com.lowagie.text match
+D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:170: error: reference to Cell is ambiguous
+            Cell titleCell = titleRow.createCell(0);
+            ^
+  both interface org.apache.poi.ss.usermodel.Cell in org.apache.poi.ss.usermodel and class com.lowagie.text.Cell in com.lowagie.text match
+D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:173: error: reference to Cell is ambiguous
+            Cell titleCell2 = titleRow.createCell(1);
+            ^
+  both interface org.apache.poi.ss.usermodel.Cell in org.apache.poi.ss.usermodel and class com.lowagie.text.Cell in com.lowagie.text match
+D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:267: error: reference to Row is ambiguous
+        Row row = sheet.createRow(rowNum);
+        ^
+  both interface org.apache.poi.ss.usermodel.Row in org.apache.poi.ss.usermodel and class com.lowagie.text.Row in com.lowagie.text match
+D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:268: error: reference to Cell is ambiguous
+        Cell cell = row.createCell(0);
+        ^
+  both interface org.apache.poi.ss.usermodel.Cell in org.apache.poi.ss.usermodel and class com.lowagie.text.Cell in com.lowagie.text match
+D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:275: error: reference to Row is ambiguous
+        Row row = sheet.createRow(rowNum);
+        ^
+  both interface org.apache.poi.ss.usermodel.Row in org.apache.poi.ss.usermodel and class com.lowagie.text.Row in com.lowagie.text match
+D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:276: error: reference to Cell is ambiguous
+        Cell labelCell = row.createCell(0);
+        ^
+  both interface org.apache.poi.ss.usermodel.Cell in org.apache.poi.ss.usermodel and class com.lowagie.text.Cell in com.lowagie.text match
+D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:279: error: reference to Cell is ambiguous
+        Cell valueCell = row.createCell(1);
+        ^
+  both interface org.apache.poi.ss.usermodel.Cell in org.apache.poi.ss.usermodel and class com.lowagie.text.Cell in com.lowagie.text match
+Note: D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\config\RestTemplateConfig.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+8 errors
+1 warning
 
-# 1. SSH into your EC2
-ssh -i your-key.pem ec2-user@your-ec2-ip
+> Task :compileJava FAILED
 
-# 2. On the EC2, create the dump
-pg_dump -U postgres -d postgres -F p -f /tmp/backup.sql
+[Incubating] Problems report is available at: file:///D:/workspace/ksp/final-2/backend/build/reports/problems/problems-report.html
 
-# 3. Exit SSH
-exit
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
 
-# 4. Download the file to your local machine
-scp -i your-key.pem ec2-user@your-ec2-ip:/tmp/backup.sql D:\workspace\ksp\backup.sql
-Option 2: One-liner from local (dump directly via SSH tunnel)
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
 
-powershell
+For more on this, please refer to https://docs.gradle.org/8.12/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+1 actionable task: 1 executed
 
-# Create SSH tunnel to RDS/PostgreSQL on EC2
-ssh -i your-key.pem -L 5433:localhost:5432 ec2-user@your-ec2-ip
+FAILURE: Build failed with an exception.
 
-# In another terminal, dump via the tunnel
-pg_dump -h localhost -p 5433 -U postgres -d postgres -F p -f D:\workspace\ksp\backup.sql
-Option 3: If PostgreSQL is on the EC2 itself (not RDS)
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler output below.
+  Note: Recompile with -Xlint:deprecation for details.Note: D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\config\RestTemplateConfig.java uses or overrides a deprecated API.D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\dto\CreateSupportTicketRequest.java:24: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+      private String priority = "MEDIUM";
+                     ^D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:169: error: reference to Row is ambiguous
+              Row titleRow = sheet.createRow(rowNum++);
+              ^
+    both interface org.apache.poi.ss.usermodel.Row in org.apache.poi.ss.usermodel and class com.lowagie.text.Row in com.lowagie.text match
+  D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:170: error: reference to Cell is ambiguous
+              Cell titleCell = titleRow.createCell(0);
+              ^
+    both interface org.apache.poi.ss.usermodel.Cell in org.apache.poi.ss.usermodel and class com.lowagie.text.Cell in com.lowagie.text match
+  D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:173: error: reference to Cell is ambiguous
+              Cell titleCell2 = titleRow.createCell(1);
+              ^
+    both interface org.apache.poi.ss.usermodel.Cell in org.apache.poi.ss.usermodel and class com.lowagie.text.Cell in com.lowagie.text match
+  D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:267: error: reference to Row is ambiguous
+          Row row = sheet.createRow(rowNum);
+          ^
+    both interface org.apache.poi.ss.usermodel.Row in org.apache.poi.ss.usermodel and class com.lowagie.text.Row in com.lowagie.text match
+  D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:268: error: reference to Cell is ambiguous
+          Cell cell = row.createCell(0);
+          ^
+    both interface org.apache.poi.ss.usermodel.Cell in org.apache.poi.ss.usermodel and class com.lowagie.text.Cell in com.lowagie.text match
+  D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:275: error: reference to Row is ambiguous
+          Row row = sheet.createRow(rowNum);
+          ^
+    both interface org.apache.poi.ss.usermodel.Row in org.apache.poi.ss.usermodel and class com.lowagie.text.Row in com.lowagie.text match
+  D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:276: error: reference to Cell is ambiguous
+          Cell labelCell = row.createCell(0);
+          ^
+    both interface org.apache.poi.ss.usermodel.Cell in org.apache.poi.ss.usermodel and class com.lowagie.text.Cell in com.lowagie.text match
+  D:\workspace\ksp\final-2\backend\src\main\java\com\policescheduler\service\PersonnelInfoReportService.java:279: error: reference to Cell is ambiguous
+          Cell valueCell = row.createCell(1);
+          ^
+    both interface org.apache.poi.ss.usermodel.Cell in org.apache.poi.ss.usermodel and class com.lowagie.text.Cell in com.lowagie.text match
+  8 errors
+  1 warning
 
-powershell
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights.
 
-# Single command: SSH + pg_dump + pipe to local file
-ssh -i your-key.pem ec2-user@your-ec2-ip "pg_dump -U postgres -d postgres" > D:\workspace\ksp\backup.sql
-Replace:
-
-your-key.pem → your actual SSH key file path
-your-ec2-ip → your EC2 public IP or DNS
-postgres → your actual DB name (from your prod .env it uses $DB_URL)
-If you're using AWS RDS instead of PostgreSQL on EC2, you'd connect to the RDS endpoint from the EC2 instance:
-
-bash
-
-pg_dump -h your-rds-endpoint.rds.amazonaws.com -U postgres -d your_db_name -F p -f /tmp/backup.sql
-Elapsed time: 13s
+BUILD FAILED in 11s
+12:54:19: Execution finished 'build'.

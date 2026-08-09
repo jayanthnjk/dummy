@@ -1,420 +1,69 @@
-import React, { useState } from 'react';
-import {
-  Box, Typography, Button, CircularProgress, alpha,
-  Tabs, Tab,
-} from '@mui/material';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import GridOnIcon from '@mui/icons-material/GridOn';
-import FileDownloadIcon from '@mui/icons-material/FileDownload';
-import DescriptionIcon from '@mui/icons-material/Description';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
-import EventBusyIcon from '@mui/icons-material/EventBusy';
-import SecurityIcon from '@mui/icons-material/Security';
-import PeopleIcon from '@mui/icons-material/People';
-import GroupsIcon from '@mui/icons-material/Groups';
+Step 1: SSH into your EC2
 
-import { useTranslation } from 'react-i18next';
-import api from '@/services/api';
-import DownloadedReportsTab from '@/components/reports/DownloadedReportsTab';
-import PageHeader from '@/components/common/PageHeader';
-import DisplayCard from '@/components/common/DisplayCard';
-import { useAuth } from '@/contexts/AuthContext';
+bash
 
-interface ReportCard {
-  title: string;
-  description: string;
-  endpoint: string;
-  filename: string;
-  excelEndpoint?: string;
-  excelFilename?: string;
-  icon: React.ReactNode;
-  color: string;
-  requiresDateRange?: boolean;
-}
+ssh -i your-key.pem ec2-user@your-ec2-ip
+Step 2: Run the SQL
 
-const ReportsPage: React.FC = () => {
-  const { t } = useTranslation();
-  const { isAdmin, isCAROnly, isMTOnly } = useAuth();
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState(0);
-  const [leaveStartDate, setLeaveStartDate] = useState<string>('');
-  const [leaveEndDate, setLeaveEndDate] = useState<string>('');
+bash
 
-  // Note: Status updates (duty reassignment expiry, adhoc duty completion) are now
-  // handled by a scheduled backend job that runs daily at 3:00 AM.
-  // See: StatusUpdateSchedulerService.java
+sudo -u postgres psql -d postgres << 'EOF'
 
-  const reports: ReportCard[] = [
-    {
-      title: t('reports.platoonChartAB', 'Platoon Chart A & B'),
-      description: t('reports.platoonChartABDesc', 'Combined Section A and Section B personnel list with duty assignments and designation counts'),
-      endpoint: '/api/reports/section-ab',
-      filename: 'PLATOON CHART A&B.pdf',
-      excelEndpoint: '/api/reports/section-ab/excel',
-      excelFilename: 'PLATOON CHART A&B.xlsx',
-      icon: <SecurityIcon />,
-      color: '#3b82f6',
-    },
-    {
-      title: t('reports.platoonChartC', 'Platoon Chart C - Rotational Duties'),
-      description: t('reports.platoonChartCDesc', 'Combined Section C, D, E, F, G platoon rotation chart with badge IDs'),
-      endpoint: '/api/reports/platoon-chart',
-      filename: 'PLATOON CHART C.pdf',
-      excelEndpoint: '/api/reports/platoon-chart/excel',
-      excelFilename: 'PLATOON CHART C.xlsx',
-      icon: <CalendarMonthIcon />,
-      color: '#059669',
-    },
-    {
-      title: t('reports.dailyStatement', 'Daily Statement (Form 168)'),
-      description: t('reports.dailyStatementDesc', 'Official daily strength and duty abstract report with designation breakdown'),
-      endpoint: '/api/reports/form-168',
-      filename: 'Statement (Form 168).pdf',
-      excelEndpoint: '/api/reports/form-168/excel',
-      excelFilename: 'Statement (Form 168).xlsx',
-      icon: <DescriptionIcon />,
-      color: '#e8722a',
-    },
-    {
-      title: t('reports.mtSection', 'MT Section - Nominal Report'),
-      description: t('reports.mtSectionDesc', 'CAR Motor Transport section with driver details, vehicle numbers, PDMS status'),
-      endpoint: '/api/reports/mt-section',
-      filename: 'mt-section-report.pdf',
-      excelEndpoint: '/api/reports/mt-section/excel',
-      excelFilename: 'mt-section.xlsx',
-      icon: <DirectionsCarIcon />,
-      color: '#0891b2',
-    },
-    {
-      title: t('reports.leaveStatement', 'Leave Statement'),
-      description: t('reports.leaveStatementDesc', 'Leave request summary with status, type, dates, and personnel details'),
-      endpoint: '/api/reports/leave-statement',
-      filename: 'Leave Statement.pdf',
-      excelEndpoint: '/api/reports/leave-statement/excel',
-      excelFilename: 'Leave Statement.xlsx',
-      icon: <EventBusyIcon />,
-      color: '#7c3aed',
-      requiresDateRange: true,
-    },
-    {
-      title: t('reports.personnelList', 'CITY ARMED RESERVE MANGALURU (C.A.R COMPANY) Personnel List'),
-      description: t('reports.personnelListDesc', 'Complete personnel directory excluding drivers'),
-      endpoint: '/api/reports/personnel',
-      filename: 'CAR MANGALURU CITY (COMPANY).pdf',
-      excelEndpoint: '/api/reports/personnel/excel',
-      excelFilename: 'CAR MANGALURU CITY (COMPANY).xlsx',
-      icon: <PeopleIcon />,
-      color: '#16a34a',
-    },
-    {
-      title: t('reports.completePersonnelList', 'Personnel List'),
-      description: t('reports.completePersonnelListDesc', 'Complete personnel combining both CAR and MT units'),
-      endpoint: '/api/reports/complete-personnel',
-      filename: 'Complete Personnel List.pdf',
-      excelEndpoint: '/api/reports/complete-personnel/excel',
-      excelFilename: 'Complete Personnel List.xlsx',
-      icon: <GroupsIcon />,
-      color: '#8b5cf6',
-    },
-  ];
+CREATE TABLE IF NOT EXISTS leave_types (
+    id BIGSERIAL PRIMARY KEY,
+    code VARCHAR(100) NOT NULL UNIQUE,
+    display_name VARCHAR(200) NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
-  // Filter reports based on user unit access
-  // Admin: all | MT-only: MT report + Leave | CAR-only: all except MT report and Complete Personnel List
-  const filteredReports = reports.filter((report) => {
-    if (isAdmin) return true;
-    if (isMTOnly) {
-      return report.endpoint === '/api/reports/mt-section' || report.endpoint === '/api/reports/leave-statement';
-    }
-    if (isCAROnly) {
-      return report.endpoint !== '/api/reports/mt-section' && report.endpoint !== '/api/reports/complete-personnel';
-    }
-    return true;
-  });
+INSERT INTO leave_types (code, display_name, sort_order) VALUES
+('CASUAL_LEAVE', 'CL (CASUAL LEAVE)', 1),
+('COMMUTED_LEAVE', 'CML (COMMUTED LEAVE)', 2),
+('PATERNITY_LEAVE', 'PL (PATERNITY LEAVE)', 3),
+('EARNED_LEAVE', 'EL (EARNED LEAVE)', 4),
+('ABSENT', 'ABSENT', 5),
+('SUSPENSION', 'SUSPENSION', 6),
+('PERMISSION', 'PERMISSION / RH TO RPI, RSI AND ARSI', 7),
+('SICK_LEAVE', 'SICK', 8),
+('WEEKLY_OFF', 'WEEKLY OFF', 9)
+ON CONFLICT (code) DO UPDATE SET
+    display_name = EXCLUDED.display_name,
+    sort_order = EXCLUDED.sort_order,
+    updated_at = CURRENT_TIMESTAMP;
 
-  const getEndpointWithDates = (endpoint: string) => {
-    if (leaveStartDate && leaveEndDate) {
-      return `${endpoint}?startDate=${leaveStartDate}&endDate=${leaveEndDate}`;
-    }
-    return endpoint;
-  };
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 
-  const handleDownload = async (report: ReportCard) => {
-    const endpoint = report.requiresDateRange ? getEndpointWithDates(report.endpoint) : report.endpoint;
-    setDownloading(report.endpoint);
-    try {
-      const response = await api.get(endpoint, { responseType: 'blob' });
-      const contentDisposition = response.headers['content-disposition'];
-      let serverFilename = report.filename;
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (match && match[1]) {
-          serverFilename = match[1].replace(/['"]/g, '');
-        }
-      }
-      const url = window.URL.createObjectURL(response.data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = serverFilename;
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Download failed:', error);
-    } finally {
-      setDownloading(null);
-    }
-  };
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_name = 'users' AND column_name = 'units') THEN
+        ALTER TABLE users ADD COLUMN units VARCHAR(100);
+    END IF;
+END $$;
 
-  const handleExcelDownload = async (report: ReportCard) => {
-    if (!report.excelEndpoint || !report.excelFilename) return;
-    const endpoint = report.requiresDateRange ? getEndpointWithDates(report.excelEndpoint) : report.excelEndpoint;
-    setDownloading(report.excelEndpoint);
-    try {
-      const response = await api.get(endpoint, { responseType: 'blob' });
-      const contentDisposition = response.headers['content-disposition'];
-      let serverFilename = report.excelFilename;
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (match && match[1]) {
-          serverFilename = match[1].replace(/['"]/g, '');
-        }
-      }
-      const url = window.URL.createObjectURL(response.data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = serverFilename;
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Excel download failed:', error);
-    } finally {
-      setDownloading(null);
-    }
-  };
+UPDATE users SET units = 'CAR,MT' WHERE role IN ('ADMIN', 'SUPPORT_ADMIN') AND units IS NULL;
+UPDATE users SET units = 'CAR' WHERE role = 'GENERAL_USER' AND units IS NULL;
+UPDATE users SET units = 'CAR,MT' WHERE role = 'HIGHER_OFFICER' AND units IS NULL;
 
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
-      {/* PageHeader replacing the gradient banner */}
-      <PageHeader
-        title={t('reports.title', 'Reports')}
-        breadcrumbs={[
-          { label: 'Home', path: '/' },
-          { label: 'Reports' },
-        ]}
-      />
+SELECT * FROM leave_types ORDER BY sort_order;
+SELECT id, username, role, units FROM users;
 
-      {/* Tabs below header */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'white' }}>
-        <Tabs
-          value={activeTab}
-          onChange={(_, newValue) => setActiveTab(newValue)}
-          sx={{
-            px: { xs: 2, md: 4 },
-            '& .MuiTab-root': {
-              textTransform: 'none',
-              fontWeight: 500,
-              color: 'text.secondary',
-              '&.Mui-selected': {
-                fontWeight: 700,
-                color: 'primary.main',
-              },
-            },
-            '& .MuiTabs-indicator': {
-              backgroundColor: 'primary.main',
-            },
-          }}
-        >
-          <Tab label={t('reports.tab.reports', 'Reports')} />
-          <Tab label={t('reports.tab.downloaded', 'Downloaded Reports')} />
-        </Tabs>
-      </Box>
+EOF
+If your PostgreSQL requires a password instead of sudo -u postgres, use:
 
-      {/* Tab Content */}
-      <Box sx={{ flex: 1, p: { xs: 2, md: 4 }, maxWidth: 1200, mx: 'auto', width: '100%' }}>
-        {activeTab === 0 && (
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: {
-                xs: '1fr',
-                md: 'repeat(2, 1fr)',
-                lg: 'repeat(3, 1fr)',
-              },
-              gap: 3,
-            }}
-          >
-            {filteredReports.map((report, index) => (
-              <DisplayCard
-                key={report.endpoint}
-                title={report.title}
-                subtitle={report.description}
-                icon={
-                  <Box
-                    sx={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 2,
-                      bgcolor: alpha(report.color, 0.1),
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: report.color,
-                    }}
-                  >
-                    {report.icon}
-                  </Box>
-                }
-                staggerIndex={index}
-              >
-                {/* Date range inputs for Leave Statement */}
-                {report.requiresDateRange && (
-                  <Box sx={{ mt: 2, mb: 1, display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-                    <Box sx={{ flex: 1, minWidth: 120 }}>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem', mb: 0.5, display: 'block' }}>
-                        {t('reports.startDate', 'Start Date')}
-                      </Typography>
-                      <input
-                        type="date"
-                        value={leaveStartDate}
-                        onChange={(e) => setLeaveStartDate(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '6px 8px',
-                          borderRadius: '6px',
-                          border: `1.5px solid ${report.color}`,
-                          fontSize: '0.75rem',
-                          outline: 'none',
-                          fontFamily: 'inherit',
-                        }}
-                      />
-                    </Box>
-                    <Box sx={{ flex: 1, minWidth: 120 }}>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem', mb: 0.5, display: 'block' }}>
-                        {t('reports.endDate', 'End Date')}
-                      </Typography>
-                      <input
-                        type="date"
-                        value={leaveEndDate}
-                        onChange={(e) => setLeaveEndDate(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '6px 8px',
-                          borderRadius: '6px',
-                          border: `1.5px solid ${report.color}`,
-                          fontSize: '0.75rem',
-                          outline: 'none',
-                          fontFamily: 'inherit',
-                        }}
-                      />
-                    </Box>
-                  </Box>
-                )}
+bash
 
-                {/* Download action buttons */}
-                <Box sx={{ mt: report.requiresDateRange ? 1 : 2 }}>
-                  {report.requiresDateRange && (!leaveStartDate || !leaveEndDate) ? (
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic', fontSize: '0.7rem' }}>
-                      {t('reports.selectDates', 'Select both dates to download')}
-                    </Typography>
-                  ) : report.excelEndpoint ? (
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={
-                          downloading === report.endpoint ? (
-                            <CircularProgress size={16} />
-                          ) : (
-                            <PictureAsPdfIcon />
-                          )
-                        }
-                        disabled={!!downloading}
-                        onClick={() => handleDownload(report)}
-                        sx={{
-                          borderRadius: 2,
-                          textTransform: 'none',
-                          fontWeight: 600,
-                          borderColor: report.color,
-                          color: report.color,
-                          '&:hover': {
-                            bgcolor: alpha(report.color, 0.08),
-                            borderColor: report.color,
-                          },
-                        }}
-                      >
-                        {downloading === report.endpoint
-                          ? t('reports.generating', 'Generating...')
-                          : t('reports.pdf', 'PDF')}
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={
-                          downloading === report.excelEndpoint ? (
-                            <CircularProgress size={16} />
-                          ) : (
-                            <GridOnIcon />
-                          )
-                        }
-                        disabled={!!downloading}
-                        onClick={() => handleExcelDownload(report)}
-                        sx={{
-                          borderRadius: 2,
-                          textTransform: 'none',
-                          fontWeight: 600,
-                          borderColor: report.color,
-                          color: report.color,
-                          '&:hover': {
-                            bgcolor: alpha(report.color, 0.08),
-                            borderColor: report.color,
-                          },
-                        }}
-                      >
-                        {downloading === report.excelEndpoint
-                          ? t('reports.generating', 'Generating...')
-                          : t('reports.excel', 'Excel')}
-                      </Button>
-                    </Box>
-                  ) : (
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={
-                        downloading === report.endpoint ? (
-                          <CircularProgress size={16} />
-                        ) : (
-                          <FileDownloadIcon />
-                        )
-                      }
-                      disabled={downloading === report.endpoint}
-                      onClick={() => handleDownload(report)}
-                      sx={{
-                        borderRadius: 2,
-                        textTransform: 'none',
-                        fontWeight: 600,
-                        borderColor: report.color,
-                        color: report.color,
-                        '&:hover': {
-                          bgcolor: alpha(report.color, 0.08),
-                          borderColor: report.color,
-                        },
-                      }}
-                    >
-                      {downloading === report.endpoint
-                        ? t('reports.generating', 'Generating...')
-                        : t('reports.downloadPdf', 'Download PDF')}
-                    </Button>
-                  )}
-                </Box>
-              </DisplayCard>
-            ))}
-          </Box>
-        )}
+psql -h localhost -U postgres -d postgres << 'EOF'
+... (same SQL above)
+EOF
+It will prompt for the password. Or pass it inline:
 
-        {activeTab === 1 && <DownloadedReportsTab />}
-      </Box>
-    </Box>
-  );
-};
+bash
 
-export default ReportsPage;
+PGPASSWORD=your_db_password psql -h localhost -U postgres -d postgres << 'EOF'
+... (same SQL above)
+EOF
+Elapsed time: 13s
